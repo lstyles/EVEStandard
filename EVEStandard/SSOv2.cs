@@ -119,15 +119,8 @@ namespace EVEStandard
 
             if (SsoMode == SSOMode.Native)
             {
-                var randomBytes = Encoding.ASCII.GetBytes(Guid.NewGuid().ToString().Replace("-",""));
-
-                model.CodeVerifier = (Convert.ToBase64String(randomBytes)).Replace("=","");
-
-                var hasher = new SHA256Managed();
-                var hashedVerifierBytes = hasher.ComputeHash(Encoding.ASCII.GetBytes(model.CodeVerifier));
-                var codeChallenge = (Convert.ToBase64String(hashedVerifierBytes)).Replace("=","").Replace("+","-").Replace("/","_");
-
-                model.SignInURI += "&code_challenge=" + codeChallenge + "&code_challenge_method=S256";
+                model.CodeVerifier = GenerateCodeVerifier();
+                model.SignInURI += "&code_challenge=" + GenerateCodeChallenge(model.CodeVerifier) + "&code_challenge_method=S256";
             }
 
             return model;
@@ -258,7 +251,6 @@ namespace EVEStandard
 
             var sub = token.Subject;
             var name = token.Claims.First(c => c.Type == "name").Value;
-            var exp = token.ValidTo;
             var scp = token.Claims.First(c => c.Type == "scp").Value;
             var owner = token.Claims.First(c => c.Type == "owner").Value;
 
@@ -267,7 +259,7 @@ namespace EVEStandard
                 CharacterId = Int32.Parse(sub.Split(':')[2]),
                 CharacterName = name,
                 CharacterOwnerHash = owner,
-                ExpiresOn = exp,
+                ExpiresOn = token.ValidTo,
                 Scopes = scp,
                 TokenType = "JWT"
             };
@@ -322,6 +314,19 @@ namespace EVEStandard
         private string GetBaseURL()
         {
             return dataSource == DataSource.Singularity ? SINGULARITY_SSO_BASE_URL : TRANQUILITY_SSO_BASE_URL;
+        }
+
+        private string GenerateCodeVerifier()
+        {
+            var randomBytes = Encoding.ASCII.GetBytes(Guid.NewGuid().ToString().Replace("-", ""));
+            return (Convert.ToBase64String(randomBytes)).Replace("=", "");
+        }
+
+        private string GenerateCodeChallenge(string codeVerifier)
+        {
+            var hasher = new SHA256Managed();
+            var hashedVerifierBytes = hasher.ComputeHash(Encoding.ASCII.GetBytes(codeVerifier));
+            return (Convert.ToBase64String(hashedVerifierBytes)).Replace("=", "").Replace("+", "-").Replace("/", "_");
         }
     }
 }
